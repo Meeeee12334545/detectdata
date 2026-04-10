@@ -14,9 +14,14 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def fix_database_url(cls, v: str) -> str:
-        # Render and Heroku provide postgres:// which SQLAlchemy 2.x no longer accepts
-        if isinstance(v, str) and v.startswith("postgres://"):
+        # Render and Heroku provide postgres:// or postgresql:// which need the
+        # explicit psycopg2 driver suffix for SQLAlchemy 2.x
+        if not isinstance(v, str):
+            return v
+        if v.startswith("postgres://"):
             return v.replace("postgres://", "postgresql+psycopg2://", 1)
+        if v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+psycopg2://", 1)
         return v
 
     detectdata_base_url: str = "https://www.detecdata-en.com"
