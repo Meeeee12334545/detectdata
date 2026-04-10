@@ -18,24 +18,40 @@ logger = logging.getLogger(__name__)
 _DB_RETRY_ATTEMPTS = 10
 _DB_RETRY_DELAY = 5  # seconds
 
+# Tracks whether the database has been successfully initialised.
+db_ready: bool = False
+
 
 async def _init_db_with_retry() -> None:
-    for attempt in range(1, _DB_RETRY_ATTEMPTS + 1):
-        try:
-            Base.metadata.create_all(bind=engine)
-            ensure_schema_compatibility()
-            return
-        except OperationalError as exc:
-            if attempt == _DB_RETRY_ATTEMPTS:
-                raise
-            logger.warning(
-                "Database not ready (attempt %d/%d): %s – retrying in %ds…",
-                attempt,
-                _DB_RETRY_ATTEMPTS,
-                exc,
-                _DB_RETRY_DELAY,
-            )
-            await asyncio.sleep(_DB_RETRY_DELAY)
+    global db_ready
+    try:
+        for attempt in range(1, _DB_RETRY_ATTEMPTS + 1):
+            try:
+                Base.metadata.create_all(bind=engine)
+                ensure_schema_compatibility()
+                db_ready = True
+                if settings.scheduler_enabled:
+                    start_scheduler()
+                logger.info("Database initialised successfully.")
+                return
+            except OperationalError as exc:
+                if attempt == _DB_RETRY_ATTEMPTS:
+                    logger.error(
+                        "Database not ready after %d attempts – giving up: %s",
+                        _DB_RETRY_ATTEMPTS,
+                        exc,
+                    )
+                    return
+                logger.warning(
+                    "Database not ready (attempt %d/%d): %s – retrying in %ds…",
+                    attempt,
+                    _DB_RETRY_ATTEMPTS,
+                    exc,
+                    _DB_RETRY_DELAY,
+                )
+                await asyncio.sleep(_DB_RETRY_DELAY)
+    except Exception:
+        logger.exception("Unexpected error during database initialisation.")
 
 
 def ensure_schema_compatibility() -> None:
@@ -45,12 +61,14 @@ def ensure_schema_compatibility() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await _init_db_with_retry()
-    if settings.scheduler_enabled:
-        start_scheduler()
+    # Run DB initialisation in the background so the HTTP server can bind its
+    # port immediately.  Render (and other platforms) need a listening port
+    # before they consider the deployment healthy.
+    db_init_task = asyncio.create_task(_init_db_with_retry())
     try:
         yield
     finally:
+        db_init_task.cancel()
         stop_scheduler()
 
 
@@ -73,4 +91,4 @@ app.include_router(control.router, prefix=settings.api_v1_prefix)
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "db_ready": db_ready}
