@@ -3,27 +3,32 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../services/api";
 
 function getMeterStatus(lastSeen) {
-  if (!lastSeen) return "offline";
+  if (!lastSeen) return "no-data";
   const ts = new Date(lastSeen).getTime();
-  if (Number.isNaN(ts)) return "offline";
+  if (Number.isNaN(ts)) return "no-data";
   const minutesAgo = (Date.now() - ts) / 60000;
   if (minutesAgo < 30) return "online";
   if (minutesAgo < 120) return "stale";
   return "offline";
 }
 
-const STATUS_LABEL = { online: "Online", stale: "Stale", offline: "Offline" };
-const STATUS_CLASS = { online: "badge-online", stale: "badge-stale", offline: "badge-offline" };
+const STATUS_LABEL = { online: "Online", stale: "Stale", offline: "Offline", "no-data": "No Data" };
+const STATUS_CLASS = { online: "badge-online", stale: "badge-stale", offline: "badge-offline", "no-data": "badge-offline" };
 
 export default function DashboardPage() {
   const [rows, setRows] = useState([]);
+  const [allSites, setAllSites] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [siteFilter, setSiteFilter] = useState("");
 
   useEffect(() => {
-    api.get("/data/latest")
-      .then((res) => setRows(res.data || []))
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.get("/data/latest").then((res) => res.data || []).catch(() => []),
+      api.get("/sites").then((res) => res.data || []).catch(() => []),
+    ]).then(([latestRows, sites]) => {
+      setRows(latestRows);
+      setAllSites(sites);
+    }).finally(() => setLoading(false));
   }, []);
 
   const meterCards = useMemo(() => {
@@ -56,13 +61,51 @@ export default function DashboardPage() {
       }
     }
 
+    // Add empty cards for sites with no data
+    const sitesWithData = new Set(Array.from(map.values()).map((m) => m.site));
+    for (const site of allSites) {
+      if (!sitesWithData.has(site.site_name)) {
+        map.set(`no-data|${site.site_name}`, {
+          pmac: site.pmac_code || "N/A",
+          site: site.site_name,
+          device: site.pmac_code ? `PMAC-${site.pmac_code}` : "Unknown",
+          lastSeen: null,
+          channels: new Map(),
+        });
+      }
+    }
+
     return Array.from(map.values())
-      .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen))
+      .sort((a, b) => {
+        if (a.lastSeen && !b.lastSeen) return -1;
+        if (!a.lastSeen && b.lastSeen) return 1;
+        return new Date(b.lastSeen) - new Date(a.lastSeen);
+      })
       .map((meter) => ({
         ...meter,
         channels: Array.from(meter.channels.values()).sort((a, b) => a.parameter.localeCompare(b.parameter)),
       }));
-  }, [rows]);
+  }, [rows, allSites]);
+
+  const filteredMeterCards = useMemo(() => {
+    const q = siteFilter.trim().toLowerCase();
+    if (!q) return meterCards;
+    return meterCards.filter((meter) => {
+      return [meter.site, meter.pmac, meter.device].some((value) =>
+        String(value || "").toLowerCase().includes(q)
+      );
+    });
+  }, [meterCards, siteFilter]);
+
+  const statusSummary = useMemo(() => {
+    return filteredMeterCards.reduce(
+      (acc, meter) => {
+        acc[getMeterStatus(meter.lastSeen)] += 1;
+        return acc;
+      },
+      { online: 0, stale: 0, offline: 0, "no-data": 0 }
+    );
+  }, [filteredMeterCards]);
 
   if (loading) {
     return (
@@ -100,14 +143,41 @@ export default function DashboardPage() {
       <div className="page-header">
         <h2 className="page-title">Dashboard</h2>
         <p className="page-desc">
-          Live readings from all connected meters &mdash; {meterCards.length} meter{meterCards.length !== 1 ? "s" : ""} reporting
+          {meterCards.length} site{meterCards.length !== 1 ? "s" : ""} &mdash; {meterCards.filter((m) => m.lastSeen).length} with data
         </p>
       </div>
+
+      <div className="dashboard-toolbar">
+        <div className="status-summary" aria-label="Status summary">
+          <span className="status-chip status-chip-online">Online {statusSummary.online}</span>
+          <span className="status-chip status-chip-stale">Stale {statusSummary.stale}</span>
+          <span className="status-chip status-chip-offline">Offline {statusSummary.offline}</span>
+          <span className="status-chip status-chip-nodata">No Data {statusSummary["no-data"]}</span>
+        </div>
+        <div className="dashboard-filter">
+          <label htmlFor="dashboard-site-filter">Quick filter</label>
+          <input
+            id="dashboard-site-filter"
+            type="search"
+            value={siteFilter}
+            onChange={(e) => setSiteFilter(e.target.value)}
+            placeholder="Site, PMAC, or device"
+          />
+        </div>
+      </div>
+
+      {filteredMeterCards.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">🔎</div>
+          <h3>No matching sites</h3>
+          <p>Try a different filter value or clear the current search.</p>
+        </div>
+      ) : (
       <div className="card-grid">
-        {meterCards.map((meter) => {
+        {filteredMeterCards.map((meter) => {
           const status = getMeterStatus(meter.lastSeen);
           return (
-            <article className="reading-card" key={`${meter.pmac}-${meter.site}-${meter.device}`}>
+            <article className={`reading-card${status === "no-data" ? " reading-card-nodata" : ""}`} key={`${meter.pmac}-${meter.site}-${meter.device}`}>
               <div className="reading-card-header">
                 <div>
                   <h3>{meter.site}</h3>
@@ -118,21 +188,30 @@ export default function DashboardPage() {
                 </div>
                 <span className={`badge ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>
               </div>
-              <div className="channel-list">
-                {meter.channels.map((channel) => (
-                  <div className="channel-row" key={`${meter.pmac}-${channel.parameter}`}>
-                    <span className="channel-name">{channel.parameter}</span>
-                    <span className="metric">{channel.value}{channel.units ? ` ${channel.units}` : ""}</span>
+              {meter.channels.length > 0 ? (
+                <>
+                  <div className="channel-list">
+                    {meter.channels.map((channel) => (
+                      <div className="channel-row" key={`${meter.pmac}-${channel.parameter}`}>
+                        <span className="channel-name">{channel.parameter}</span>
+                        <span className="metric">{channel.value}{channel.units ? ` ${channel.units}` : ""}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="reading-card-footer">
-                Updated {new Date(meter.lastSeen).toLocaleString()}
-              </div>
+                  <div className="reading-card-footer">
+                    Updated {new Date(meter.lastSeen).toLocaleString()}
+                  </div>
+                </>
+              ) : (
+                <div className="channel-list">
+                  <div className="no-data-msg">No historical data available</div>
+                </div>
+              )}
             </article>
           );
         })}
       </div>
+      )}
     </section>
   );
 }

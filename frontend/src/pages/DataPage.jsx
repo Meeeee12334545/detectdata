@@ -21,6 +21,15 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+function getRangePreset(hours) {
+  const end = new Date();
+  const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
+  return {
+    start: toLocalDatetimeValue(start),
+    end: toLocalDatetimeValue(end),
+  };
+}
+
 export default function DataPage() {
   const [inventory, setInventory] = useState([]);
   const [selectedSite, setSelectedSite] = useState("");
@@ -137,6 +146,12 @@ export default function DataPage() {
 
   const selectedChannelObj = siteChannels.find((c) => String(c.channel_id) === String(selectedChannel));
 
+  function applyRangePreset(hours) {
+    const range = getRangePreset(hours);
+    setStart(range.start);
+    setEnd(range.end);
+  }
+
   return (
     <section>
       <div className="page-header">
@@ -145,6 +160,13 @@ export default function DataPage() {
       </div>
 
       <div className="data-controls-card">
+        <div className="range-presets" role="group" aria-label="Date range presets">
+          <span className="range-presets-label">Quick range</span>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => applyRangePreset(24)}>24h</button>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => applyRangePreset(24 * 3)}>3d</button>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => applyRangePreset(24 * 7)}>7d</button>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => applyRangePreset(24 * 30)}>30d</button>
+        </div>
         <div className="data-controls">
           <label>
             Site

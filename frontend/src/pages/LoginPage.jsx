@@ -5,6 +5,7 @@ import { api } from "../services/api";
 export default function LoginPage({ onLogin }) {
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin123");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -57,17 +58,27 @@ export default function LoginPage({ onLogin }) {
             <label className="form-label" htmlFor="password">Password</label>
             <input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               placeholder="Enter your password"
             />
+            <label className="inline-check login-inline-check" htmlFor="show-password">
+              <input
+                id="show-password"
+                type="checkbox"
+                checked={showPassword}
+                onChange={(e) => setShowPassword(e.target.checked)}
+              />
+              Show password
+            </label>
           </div>
           {error ? <p className="error-text">{error}</p> : null}
           <button className="primary login-submit" disabled={busy} type="submit">
             {busy ? "Signing in…" : "Sign In"}
           </button>
+          <p className="login-help">Default local credentials are admin / admin123.</p>
         </form>
       </div>
     </div>

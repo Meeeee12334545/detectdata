@@ -28,12 +28,16 @@ function navClass({ isActive }) {
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("eds_token") || "");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isAuthenticated = useMemo(() => Boolean(token), [token]);
 
   const logout = () => {
     localStorage.removeItem("eds_token");
+    setMobileNavOpen(false);
     setToken("");
   };
+
+  const closeMobileNav = () => setMobileNavOpen(false);
 
   if (!isAuthenticated) {
     return (
@@ -50,10 +54,19 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <BrandLogo />
-        <nav>
-          <NavLink to="/" end className={navClass}>Dashboard</NavLink>
-          <NavLink to="/data" className={navClass}>Data</NavLink>
-          <NavLink to="/manage" className={navClass}>Manage</NavLink>
+        <button
+          className="mobile-nav-toggle"
+          type="button"
+          aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={mobileNavOpen}
+          onClick={() => setMobileNavOpen((prev) => !prev)}
+        >
+          {mobileNavOpen ? "Close" : "Menu"}
+        </button>
+        <nav className={mobileNavOpen ? "open" : ""}>
+          <NavLink to="/" end className={navClass} onClick={closeMobileNav}>Dashboard</NavLink>
+          <NavLink to="/data" className={navClass} onClick={closeMobileNav}>Data</NavLink>
+          <NavLink to="/manage" className={navClass} onClick={closeMobileNav}>Manage</NavLink>
           <span className="nav-divider" />
           <button className="link-button" onClick={logout} type="button">Sign Out</button>
         </nav>

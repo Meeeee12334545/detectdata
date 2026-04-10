@@ -6,6 +6,7 @@ export default function ManagePage() {
   const [sites, setSites] = useState([]);
   const [selectedSiteId, setSelectedSiteId] = useState("");
   const [channels, setChannels] = useState([]);
+  const [channelFilter, setChannelFilter] = useState("");
   const [hydraulic, setHydraulic] = useState({
     enabled: false,
     pipe_shape: "circular",
@@ -59,8 +60,22 @@ export default function ManagePage() {
     [channels]
   );
 
+  const filteredChannels = useMemo(() => {
+    const q = channelFilter.trim().toLowerCase();
+    if (!q) return channels;
+    return channels.filter((c) => {
+      return [c.parameter, c.units, c.display_name, c.channel_id].some((value) =>
+        String(value || "").toLowerCase().includes(q)
+      );
+    });
+  }, [channels, channelFilter]);
+
   const updateVisibility = (channelId, patch) => {
     setChannels((prev) => prev.map((c) => (c.channel_id === channelId ? { ...c, ...patch } : c)));
+  };
+
+  const setAllVisibility = (visible) => {
+    setChannels((prev) => prev.map((c) => ({ ...c, is_viewable: visible })));
   };
 
   const saveVisibility = async () => {
@@ -136,8 +151,21 @@ export default function ManagePage() {
 
         <article>
           <h3>Channel Visibility</h3>
+          <div className="manage-field">
+            <span className="manage-field-label">Filter channels</span>
+            <input
+              type="search"
+              placeholder="Search by parameter, unit, label, or channel id"
+              value={channelFilter}
+              onChange={(e) => setChannelFilter(e.target.value)}
+            />
+          </div>
+          <div className="manage-actions-row">
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setAllVisibility(true)}>Select All</button>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setAllVisibility(false)}>Clear All</button>
+          </div>
           <div className="manage-list">
-            {channels.map((c) => (
+            {filteredChannels.map((c) => (
               <div key={c.channel_id} className="manage-row-item">
                 <label>
                   <input
@@ -155,6 +183,7 @@ export default function ManagePage() {
                 />
               </div>
             ))}
+            {filteredChannels.length === 0 ? <p className="muted">No channels match the current filter.</p> : null}
           </div>
           <button className="primary" type="button" onClick={saveVisibility}>Save Visibility</button>
         </article>

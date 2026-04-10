@@ -3,15 +3,13 @@ services:
     image: postgres:16
     environment:
       POSTGRES_USER: eds
-      POSTGRES_PASSWORD: eds
+      POSTGRES_PASSWORD: O4OyUz3d_NGdyWHNtZckouwyrCMcM7_TXztdOp6zE6k
       POSTGRES_DB: eds
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U eds -d eds"]
       interval: 5s
       timeout: 5s
       retries: 12
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -21,8 +19,8 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: postgresql+psycopg2://eds:eds@db:5432/eds
-      SECRET_KEY: change-this-secret
+      DATABASE_URL: postgresql+psycopg2://eds:O4OyUz3d_NGdyWHNtZckouwyrCMcM7_TXztdOp6zE6k@db:5432/eds
+      SECRET_KEY: 37d2bd0387f2b71ff3dd9fd1e47e04f7a39fbbf97a9bd992a561ea8716597d942d9584ef40768351dbedda9a410f33d74eb3c1940cf8b53095af973bdbed9a0b
       SCHEDULER_ENABLED: "true"
     ports:
       - "8000:8000"

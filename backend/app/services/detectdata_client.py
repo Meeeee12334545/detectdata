@@ -70,26 +70,39 @@ class DetectDataClient:
         return page.title() != "Sign In" and page.locator("#UtiliCoreLoginDialog").count() == 0
 
     @staticmethod
-    def _asmx_json(page: Page, method: str, payload: dict | str):
+    def _asmx_json(page: Page, method: str, payload: dict | str, timeout_ms: int = 20000):
         return page.evaluate(
-            """async ({ method, payload }) => {
+            """async ({ method, payload, timeoutMs }) => {
                 function callAsmx() {
                     return new Promise((resolve) => {
+                        let finished = false;
+                        const done = (value) => {
+                            if (!finished) {
+                                finished = true;
+                                resolve(value);
+                            }
+                        };
+
+                        const timer = setTimeout(() => {
+                            done({ ok: false, err: `Timeout calling ${method} after ${timeoutMs}ms` });
+                        }, timeoutMs);
+
                         try {
                             asmxJSON(
                                 method,
                                 payload,
-                                function (data) { resolve({ ok: true, data: data }); },
-                                function (err) { resolve({ ok: false, err: err }); }
+                                function (data) { clearTimeout(timer); done({ ok: true, data: data }); },
+                                function (err) { clearTimeout(timer); done({ ok: false, err: err }); }
                             );
                         } catch (e) {
-                            resolve({ ok: false, err: String(e) });
+                            clearTimeout(timer);
+                            done({ ok: false, err: String(e) });
                         }
                     });
                 }
                 return await callAsmx();
             }""",
-            {"method": method, "payload": payload},
+            {"method": method, "payload": payload, "timeoutMs": timeout_ms},
         )
 
     @staticmethod
