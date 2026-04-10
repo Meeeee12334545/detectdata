@@ -54,4 +54,3 @@ databases:
   - name: detectdata-db
     databaseName: eds
     user: eds
-    plan: free
