@@ -17,7 +17,8 @@ services:
     build:
       context: ./backend
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg2://eds:O4OyUz3d_NGdyWHNtZckouwyrCMcM7_TXztdOp6zE6k@db:5432/eds
       SECRET_KEY: 37d2bd0387f2b71ff3dd9fd1e47e04f7a39fbbf97a9bd992a561ea8716597d942d9584ef40768351dbedda9a410f33d74eb3c1940cf8b53095af973bdbed9a0b

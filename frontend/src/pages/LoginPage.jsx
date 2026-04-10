@@ -21,8 +21,12 @@ export default function LoginPage({ onLogin }) {
       }
       localStorage.setItem("eds_token", token);
       onLogin(token);
-    } catch {
-      setError("Login failed. Check your username and password.");
+    } catch (err) {
+      if (err?.response?.status === 503) {
+        setError("Service is starting up, please try again in a moment.");
+      } else {
+        setError("Login failed. Check your username and password.");
+      }
     } finally {
       setBusy(false);
     }
