@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     scheduler_enabled: bool = True
 
-    frontend_url: str = "http://localhost:5173"
+    frontend_url: str = "https://detectdata-frontend.onrender.com"
 
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
