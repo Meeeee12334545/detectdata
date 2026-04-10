@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
 from app.workers.scheduler import start_scheduler, stop_scheduler
+from scripts.bootstrap_admin import run as bootstrap_admin
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ async def _init_db_with_retry() -> None:
             try:
                 Base.metadata.create_all(bind=engine)
                 ensure_schema_compatibility()
+                bootstrap_admin()
                 db_ready = True
                 if settings.scheduler_enabled:
                     start_scheduler()
