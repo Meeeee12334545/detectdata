@@ -2,8 +2,8 @@ services:
   - type: web
     name: detectdata
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     healthCheckPath: /health
     envVars:
@@ -31,21 +31,6 @@ services:
         sync: false
       - key: DETECTDATA_PASSWORD
         sync: false
-      - key: FRONTEND_URL
-        value: https://detectdata-frontend.onrender.com
-      - key: CORS_ORIGINS
-        value: '["https://detectdata-frontend.onrender.com"]'
-
-  - type: web
-    name: detectdata-frontend
-    runtime: docker
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
-    plan: free
-    healthCheckPath: /
-    envVars:
-      - key: VITE_API_BASE
-        value: https://detectdata.onrender.com/api/v1
 
 databases:
   - name: detectdata-db
