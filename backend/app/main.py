@@ -1,10 +1,11 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
@@ -75,14 +76,6 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title=settings.project_name, lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(sites.router, prefix=settings.api_v1_prefix)
 app.include_router(data.router, prefix=settings.api_v1_prefix)
@@ -90,11 +83,18 @@ app.include_router(admin.router, prefix=settings.api_v1_prefix)
 app.include_router(control.router, prefix=settings.api_v1_prefix)
 
 
-@app.get("/")
-def root() -> RedirectResponse:
-    return RedirectResponse(url=settings.frontend_url)
-
-
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "db_ready": db_ready}
+
+
+# Serve the built React frontend (present in production image at /app/static)
+_static_dir = Path("/app/static")
+if _static_dir.is_dir():
+    _assets_dir = _static_dir / "assets"
+    if _assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="static-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_spa(full_path: str) -> FileResponse:
+        return FileResponse(str(_static_dir / "index.html"))
