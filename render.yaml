@@ -37,19 +37,16 @@ services:
 
   - type: web
     name: detectdata-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    healthCheckPath: /
     envVars:
       # Set VITE_API_BASE to your backend URL + /api/v1
       # e.g. https://detectdata-backend.onrender.com/api/v1
       - key: VITE_API_BASE
         sync: false
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
 
 databases:
   - name: detectdata-db
