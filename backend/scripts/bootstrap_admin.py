@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 from app.db.base import Base
 from app.db.models import Role, User
 from app.db.session import SessionLocal, engine
@@ -16,7 +16,12 @@ def run() -> None:
     try:
         existing = db.query(User).filter(User.username == DEFAULT_USERNAME).first()
         if existing:
-            print("Admin already exists")
+            if not verify_password(DEFAULT_PASSWORD, existing.password_hash):
+                existing.password_hash = get_password_hash(DEFAULT_PASSWORD)
+                db.commit()
+                print("Reset admin password to default")
+            else:
+                print("Admin already exists")
             return
 
         admin = User(

@@ -3,8 +3,8 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, status
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
@@ -86,8 +86,13 @@ app.include_router(control.router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/health")
-def health() -> dict:
-    return {"status": "ok", "db_ready": db_ready}
+def health():
+    if not db_ready:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "starting", "db_ready": False},
+        )
+    return {"status": "ok", "db_ready": True}
 
 
 # Serve the built React frontend (present in production image at /app/static)
