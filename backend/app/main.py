@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
@@ -87,6 +88,11 @@ app.include_router(sites.router, prefix=settings.api_v1_prefix)
 app.include_router(data.router, prefix=settings.api_v1_prefix)
 app.include_router(admin.router, prefix=settings.api_v1_prefix)
 app.include_router(control.router, prefix=settings.api_v1_prefix)
+
+
+@app.get("/")
+def root() -> RedirectResponse:
+    return RedirectResponse(url=settings.frontend_url)
 
 
 @app.get("/health")
