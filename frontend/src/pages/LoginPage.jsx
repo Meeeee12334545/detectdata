@@ -21,35 +21,55 @@ export default function LoginPage({ onLogin }) {
       localStorage.setItem("eds_token", token);
       onLogin(token);
     } catch {
-      setError("Login failed. Check username/password.");
+      setError("Login failed. Check your username and password.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <section className="login-panel">
-      <h2>Sign In</h2>
-      <p className="muted">Use your EDS platform credentials to access data.</p>
-      <form onSubmit={submit} className="login-form">
-        <label>
-          Username
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-        </label>
-        {error ? <p className="error-text">{error}</p> : null}
-        <button className="primary" disabled={busy} type="submit">
-          {busy ? "Signing in..." : "Sign In"}
-        </button>
-      </form>
-    </section>
+    <div className="login-shell">
+      <div className="login-card">
+        <div className="login-logo">
+          <div className="login-logo-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12h4l3-9 4 18 3-9h4" />
+            </svg>
+          </div>
+          <div className="login-logo-text">
+            <h2>EDS Platform</h2>
+            <p>Environmental Data Services</p>
+          </div>
+        </div>
+
+        <form onSubmit={submit} className="login-form">
+          <div className="form-group">
+            <label className="form-label" htmlFor="username">Username</label>
+            <input
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              placeholder="Enter your username"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              placeholder="Enter your password"
+            />
+          </div>
+          {error ? <p className="error-text">{error}</p> : null}
+          <button className="primary login-submit" disabled={busy} type="submit">
+            {busy ? "Signing in…" : "Sign In"}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }

@@ -1,10 +1,30 @@
 import { useMemo, useState } from "react";
-import { Link, Route, Routes } from "react-router-dom";
+import { NavLink, Route, Routes } from "react-router-dom";
 
 import DashboardPage from "./pages/DashboardPage";
 import DataPage from "./pages/DataPage";
 import LoginPage from "./pages/LoginPage";
 import ManagePage from "./pages/ManagePage";
+
+function BrandLogo() {
+  return (
+    <div className="brand">
+      <div className="brand-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12h4l3-9 4 18 3-9h4" />
+        </svg>
+      </div>
+      <div>
+        <div className="brand-name">EDS Platform</div>
+        <div className="brand-tag">Environmental Data Services</div>
+      </div>
+    </div>
+  );
+}
+
+function navClass({ isActive }) {
+  return isActive ? "nav-link active" : "nav-link";
+}
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("eds_token") || "");
@@ -19,14 +39,9 @@ export default function App() {
     return (
       <div className="app-shell">
         <header className="app-header">
-          <div>
-            <p className="eyebrow">Environmental Data Services</p>
-            <h1>EDS Data Platform</h1>
-          </div>
+          <BrandLogo />
         </header>
-        <main className="app-main">
-          <LoginPage onLogin={setToken} />
-        </main>
+        <LoginPage onLogin={setToken} />
       </div>
     );
   }
@@ -34,15 +49,13 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div>
-          <p className="eyebrow">Environmental Data Services</p>
-          <h1>EDS Data Platform</h1>
-        </div>
+        <BrandLogo />
         <nav>
-          <Link to="/">Dashboard</Link>
-          <Link to="/data">Data</Link>
-          <Link to="/manage">Manage</Link>
-          <button className="link-button" onClick={logout} type="button">Logout</button>
+          <NavLink to="/" end className={navClass}>Dashboard</NavLink>
+          <NavLink to="/data" className={navClass}>Data</NavLink>
+          <NavLink to="/manage" className={navClass}>Manage</NavLink>
+          <span className="nav-divider" />
+          <button className="link-button" onClick={logout} type="button">Sign Out</button>
         </nav>
       </header>
 
