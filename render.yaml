@@ -30,6 +30,9 @@ services:
         sync: false
       - key: DETECTDATA_PASSWORD
         sync: false
+      - key: CORS_ORIGINS
+        # Add your Render frontend URL here, e.g. https://detectdata-frontend.onrender.com
+        sync: false
 
   - type: web
     name: detectdata-frontend
