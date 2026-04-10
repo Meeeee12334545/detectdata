@@ -7,12 +7,12 @@ from fastapi import FastAPI, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-from sqlalchemy.exc import OperationalError
 
 from app.api.routes import admin, auth, control, data, sites
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
+import app.state as app_state
 from app.workers.scheduler import start_scheduler, stop_scheduler
 from scripts.bootstrap_admin import run as bootstrap_admin
 
@@ -21,41 +21,40 @@ logger = logging.getLogger(__name__)
 _DB_RETRY_ATTEMPTS = 10
 _DB_RETRY_DELAY = 5  # seconds
 
-# Tracks whether the database has been successfully initialised.
-db_ready: bool = False
-
 
 async def _init_db_with_retry() -> None:
-    global db_ready
-    try:
-        for attempt in range(1, _DB_RETRY_ATTEMPTS + 1):
+    for attempt in range(1, _DB_RETRY_ATTEMPTS + 1):
+        try:
+            Base.metadata.create_all(bind=engine)
             try:
-                Base.metadata.create_all(bind=engine)
                 ensure_schema_compatibility()
-                bootstrap_admin()
-                db_ready = True
-                if settings.scheduler_enabled:
+            except Exception as compat_exc:
+                logger.warning("Schema compatibility check failed (non-fatal): %s", compat_exc)
+            bootstrap_admin()
+            app_state.db_ready = True
+            if settings.scheduler_enabled:
+                try:
                     start_scheduler()
-                logger.info("Database initialised successfully.")
-                return
-            except OperationalError as exc:
-                if attempt == _DB_RETRY_ATTEMPTS:
-                    logger.error(
-                        "Database not ready after %d attempts – giving up: %s",
-                        _DB_RETRY_ATTEMPTS,
-                        exc,
-                    )
-                    return
-                logger.warning(
-                    "Database not ready (attempt %d/%d): %s – retrying in %ds…",
-                    attempt,
+                except Exception as sched_exc:
+                    logger.warning("Scheduler failed to start: %s", sched_exc)
+            logger.info("Database initialised successfully.")
+            return
+        except Exception as exc:
+            if attempt == _DB_RETRY_ATTEMPTS:
+                logger.error(
+                    "Database not ready after %d attempts – giving up: %s",
                     _DB_RETRY_ATTEMPTS,
                     exc,
-                    _DB_RETRY_DELAY,
                 )
-                await asyncio.sleep(_DB_RETRY_DELAY)
-    except Exception:
-        logger.exception("Unexpected error during database initialisation.")
+                return
+            logger.warning(
+                "Database not ready (attempt %d/%d): %s – retrying in %ds…",
+                attempt,
+                _DB_RETRY_ATTEMPTS,
+                exc,
+                _DB_RETRY_DELAY,
+            )
+            await asyncio.sleep(_DB_RETRY_DELAY)
 
 
 def ensure_schema_compatibility() -> None:
@@ -87,7 +86,7 @@ app.include_router(control.router, prefix=settings.api_v1_prefix)
 
 @app.get("/health")
 def health():
-    if not db_ready:
+    if not app_state.db_ready:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"status": "starting", "db_ready": False},
