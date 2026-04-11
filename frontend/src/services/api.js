@@ -15,3 +15,14 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err?.response?.status === 401) {
+      localStorage.removeItem("eds_token");
+      window.location.reload();
+    }
+    return Promise.reject(err);
+  }
+);
