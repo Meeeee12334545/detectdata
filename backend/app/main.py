@@ -26,12 +26,15 @@ async def _init_db_with_retry() -> None:
     while True:
         attempt += 1
         try:
-            Base.metadata.create_all(bind=engine)
+            # Run all blocking synchronous DB operations in a thread so the
+            # event loop (and therefore the HTTP server) is never frozen while
+            # waiting for the database to respond.
+            await asyncio.to_thread(lambda: Base.metadata.create_all(bind=engine))
             try:
-                ensure_schema_compatibility()
+                await asyncio.to_thread(ensure_schema_compatibility)
             except Exception as compat_exc:
                 logger.warning("Schema compatibility check failed (non-fatal): %s", compat_exc)
-            bootstrap_admin()
+            await asyncio.to_thread(bootstrap_admin)
             app_state.db_ready = True
             if settings.scheduler_enabled:
                 try:
