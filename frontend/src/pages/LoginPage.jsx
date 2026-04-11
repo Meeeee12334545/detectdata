@@ -34,10 +34,14 @@ export default function LoginPage({ onLogin }) {
         onLogin(token);
       })
       .catch((err) => {
-        if (err?.response?.status === 503) {
+        // Retry automatically on 503 (service starting) or any network/timeout
+        // error where there is no response at all (e.g. event-loop was busy).
+        const shouldRetry = err?.response?.status === 503 || !err?.response;
+        if (shouldRetry) {
           setError("Service is starting up, please wait…");
           let secs = 5;
           setCountdown(secs);
+          // Keep busy=true so the button stays disabled during the countdown
           retryRef.current = setInterval(() => {
             secs -= 1;
             setCountdown(secs);
@@ -48,11 +52,14 @@ export default function LoginPage({ onLogin }) {
             }
           }, 1000);
         } else {
-          setError("Login failed. Check your username and password.");
+          // Definitive error (e.g. 401 wrong password) — re-enable the form
+          setBusy(false);
+          setError(
+            err?.response?.status === 401
+              ? "Invalid username or password."
+              : "Login failed. Please try again."
+          );
         }
-      })
-      .finally(() => {
-        setBusy(false);
       });
   };
 
@@ -112,7 +119,7 @@ export default function LoginPage({ onLogin }) {
           </div>
           {errorMsg ? <p className="error-text">{errorMsg}</p> : null}
           <button className="primary login-submit" disabled={busy} type="submit">
-            {busy ? "Signing in…" : "Sign In"}
+            {countdown > 0 ? `Retrying in ${countdown}s…` : busy ? "Signing in…" : "Sign In"}
           </button>
           <p className="login-help">Default local credentials are admin / admin123.</p>
         </form>
