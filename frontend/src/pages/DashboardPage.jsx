@@ -23,20 +23,20 @@ export default function DashboardPage() {
   const [siteFilter, setSiteFilter] = useState("");
 
   useEffect(() => {
-    let errorCount = 0;
+    let dataLoadErrorCount = 0;
     Promise.all([
       api.get("/data/latest").then((res) => res.data || []).catch((err) => {
-        if (err?.response?.status !== 401) errorCount += 1;
+        if (err?.response?.status !== 401) dataLoadErrorCount += 1;
         return [];
       }),
       api.get("/sites").then((res) => res.data || []).catch((err) => {
-        if (err?.response?.status !== 401) errorCount += 1;
+        if (err?.response?.status !== 401) dataLoadErrorCount += 1;
         return [];
       }),
     ]).then(([latestRows, sites]) => {
       setRows(latestRows);
       setAllSites(sites);
-      if (errorCount > 0) setLoadError("Some data failed to load. Please refresh the page or check your connection.");
+      if (dataLoadErrorCount > 0) setLoadError("Some data failed to load. Please refresh the page or check your connection.");
     }).finally(() => setLoading(false));
   }, []);
 
@@ -131,34 +131,29 @@ export default function DashboardPage() {
     );
   }
 
-  if (meterCards.length === 0) {
-    return (
-      <section>
-        <div className="page-header">
-          <h2 className="page-title">Dashboard</h2>
+  return (
+    <section>
+      <div className="page-header">
+        <h2 className="page-title">Dashboard</h2>
+        {meterCards.length === 0 ? (
           <p className="page-desc">Live readings from all connected meters</p>
-        </div>
-        {loadError && <p className="error" style={{ marginBottom: "1rem" }}>{loadError}</p>}
+        ) : (
+          <p className="page-desc">
+            {meterCards.length} site{meterCards.length !== 1 ? "s" : ""} &mdash; {meterCards.filter((m) => m.lastSeen).length} with data
+          </p>
+        )}
+      </div>
+
+      {loadError && <p className="error" style={{ marginBottom: "1rem" }}>{loadError}</p>}
+
+      {meterCards.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📡</div>
           <h3>No meters found</h3>
           <p>No data has been received yet. Check your meter connections and data ingestion pipeline.</p>
         </div>
-      </section>
-    );
-  }
-
-  return (
-    <section>
-      <div className="page-header">
-        <h2 className="page-title">Dashboard</h2>
-        <p className="page-desc">
-          {meterCards.length} site{meterCards.length !== 1 ? "s" : ""} &mdash; {meterCards.filter((m) => m.lastSeen).length} with data
-        </p>
-      </div>
-
-      {loadError && <p className="error" style={{ marginBottom: "1rem" }}>{loadError}</p>}
-
+      ) : (
+      <>
       <div className="dashboard-toolbar">
         <div className="status-summary" aria-label="Status summary">
           <span className="status-chip status-chip-online">Online {statusSummary.online}</span>
@@ -223,6 +218,8 @@ export default function DashboardPage() {
           );
         })}
       </div>
+      )}
+      </>
       )}
     </section>
   );
