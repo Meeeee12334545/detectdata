@@ -13,7 +13,7 @@ from app.schemas.auth import LoginRequest, TokenResponse, UserProfile
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_DB_WAIT_SECONDS = 24
+_DB_WAIT_SECONDS = 30
 _DB_WAIT_INTERVAL = 2
 
 

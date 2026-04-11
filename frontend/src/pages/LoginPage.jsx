@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { api } from "../services/api";
 
+// Maximum number of automatic retry attempts after the first login request.
+const MAX_AUTO_RETRIES = 8;
+
 export default function LoginPage({ onLogin }) {
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin123");
@@ -10,6 +13,7 @@ export default function LoginPage({ onLogin }) {
   const [busy, setBusy] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const retryRef = useRef(null);
+  const retryCountRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -29,15 +33,22 @@ export default function LoginPage({ onLogin }) {
       .post("/auth/login", { username: usr, password: pwd })
       .then((res) => {
         const token = res.data?.access_token;
-        if (!token) throw new Error("No token returned");
+        if (!token) {
+          // Unexpected server response — treat as a definitive failure so we
+          // don't loop forever on a malformed reply.
+          setBusy(false);
+          setError("Login failed. Unexpected server response.");
+          return;
+        }
         localStorage.setItem("eds_token", token);
         onLogin(token);
       })
       .catch((err) => {
         // Retry automatically on 503 (service starting) or any network/timeout
-        // error where there is no response at all (e.g. event-loop was busy).
-        const shouldRetry = err?.response?.status === 503 || !err?.response;
-        if (shouldRetry) {
+        // error where there is no HTTP response at all (e.g. cold-start spin-up).
+        const isTransient = err?.response?.status === 503 || !err?.response;
+        if (isTransient && retryCountRef.current < MAX_AUTO_RETRIES) {
+          retryCountRef.current += 1;
           setError("Service is starting up, please wait…");
           let secs = 5;
           setCountdown(secs);
@@ -52,19 +63,25 @@ export default function LoginPage({ onLogin }) {
             }
           }, 1000);
         } else {
-          // Definitive error (e.g. 401 wrong password) — re-enable the form
+          // Definitive error (401 wrong credentials, max retries reached, etc.)
           setBusy(false);
-          setError(
-            err?.response?.status === 401
-              ? "Invalid username or password."
-              : "Login failed. Please try again."
-          );
+          if (err?.response?.status === 401) {
+            setError("Invalid username or password.");
+          } else if (isTransient) {
+            setError(
+              "Service is unavailable after several attempts. " +
+              "Please try again later or contact support if the problem persists."
+            );
+          } else {
+            setError("Login failed. Please try again.");
+          }
         }
       });
   };
 
   const submit = (event) => {
     event.preventDefault();
+    retryCountRef.current = 0;
     attemptLogin(username, password);
   };
 
