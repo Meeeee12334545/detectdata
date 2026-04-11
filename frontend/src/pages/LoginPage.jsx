@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../services/api";
 
@@ -8,29 +8,61 @@ export default function LoginPage({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const retryRef = useRef(null);
 
-  const submit = async (event) => {
-    event.preventDefault();
+  useEffect(() => {
+    return () => {
+      if (retryRef.current) clearInterval(retryRef.current);
+    };
+  }, []);
+
+  const attemptLogin = (usr, pwd) => {
+    if (retryRef.current) {
+      clearInterval(retryRef.current);
+      retryRef.current = null;
+    }
+    setCountdown(0);
     setBusy(true);
     setError("");
-    try {
-      const res = await api.post("/auth/login", { username, password });
-      const token = res.data?.access_token;
-      if (!token) {
-        throw new Error("No token returned");
-      }
-      localStorage.setItem("eds_token", token);
-      onLogin(token);
-    } catch (err) {
-      if (err?.response?.status === 503) {
-        setError("Service is starting up, please try again in a moment.");
-      } else {
-        setError("Login failed. Check your username and password.");
-      }
-    } finally {
-      setBusy(false);
-    }
+    api
+      .post("/auth/login", { username: usr, password: pwd })
+      .then((res) => {
+        const token = res.data?.access_token;
+        if (!token) throw new Error("No token returned");
+        localStorage.setItem("eds_token", token);
+        onLogin(token);
+      })
+      .catch((err) => {
+        if (err?.response?.status === 503) {
+          setError("Service is starting up, please wait…");
+          let secs = 5;
+          setCountdown(secs);
+          retryRef.current = setInterval(() => {
+            secs -= 1;
+            setCountdown(secs);
+            if (secs <= 0) {
+              clearInterval(retryRef.current);
+              retryRef.current = null;
+              attemptLogin(usr, pwd);
+            }
+          }, 1000);
+        } else {
+          setError("Login failed. Check your username and password.");
+        }
+      })
+      .finally(() => {
+        setBusy(false);
+      });
   };
+
+  const submit = (event) => {
+    event.preventDefault();
+    attemptLogin(username, password);
+  };
+
+  const errorMsg =
+    countdown > 0 ? `Service is starting up, retrying in ${countdown}s…` : error;
 
   return (
     <div className="login-shell">
@@ -78,7 +110,7 @@ export default function LoginPage({ onLogin }) {
               Show password
             </label>
           </div>
-          {error ? <p className="error-text">{error}</p> : null}
+          {errorMsg ? <p className="error-text">{errorMsg}</p> : null}
           <button className="primary login-submit" disabled={busy} type="submit">
             {busy ? "Signing in…" : "Sign In"}
           </button>

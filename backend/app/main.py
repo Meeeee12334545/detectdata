@@ -18,12 +18,13 @@ from scripts.bootstrap_admin import run as bootstrap_admin
 
 logger = logging.getLogger(__name__)
 
-_DB_RETRY_ATTEMPTS = 10
 _DB_RETRY_DELAY = 5  # seconds
 
 
 async def _init_db_with_retry() -> None:
-    for attempt in range(1, _DB_RETRY_ATTEMPTS + 1):
+    attempt = 0
+    while True:
+        attempt += 1
         try:
             Base.metadata.create_all(bind=engine)
             try:
@@ -40,17 +41,9 @@ async def _init_db_with_retry() -> None:
             logger.info("Database initialised successfully.")
             return
         except Exception as exc:
-            if attempt == _DB_RETRY_ATTEMPTS:
-                logger.error(
-                    "Database not ready after %d attempts – giving up: %s",
-                    _DB_RETRY_ATTEMPTS,
-                    exc,
-                )
-                return
             logger.warning(
-                "Database not ready (attempt %d/%d): %s – retrying in %ds…",
+                "Database not ready (attempt %d): %s – retrying in %ds…",
                 attempt,
-                _DB_RETRY_ATTEMPTS,
                 exc,
                 _DB_RETRY_DELAY,
             )
