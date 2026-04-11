@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
 
-    database_url: str = "postgresql+psycopg2://eds:eds@localhost:5432/eds"
+    database_url: str = "sqlite:///./eds.db"
 
     @field_validator("database_url", mode="before")
     @classmethod
