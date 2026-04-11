@@ -13,7 +13,8 @@ from app.schemas.auth import LoginRequest, TokenResponse, UserProfile
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_DB_WAIT_SECONDS = 25
+_DB_WAIT_SECONDS = 24
+_DB_WAIT_INTERVAL = 2
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -22,8 +23,8 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenRe
     # rather than immediately returning 503. The event loop stays free because
     # _init_db_with_retry now runs its blocking work in a thread.
     if not app_state.db_ready:
-        for _ in range(_DB_WAIT_SECONDS):
-            await asyncio.sleep(1)
+        for _ in range(_DB_WAIT_SECONDS // _DB_WAIT_INTERVAL):
+            await asyncio.sleep(_DB_WAIT_INTERVAL)
             if app_state.db_ready:
                 break
         else:

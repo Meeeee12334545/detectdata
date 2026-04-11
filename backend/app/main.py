@@ -29,7 +29,7 @@ async def _init_db_with_retry() -> None:
             # Run all blocking synchronous DB operations in a thread so the
             # event loop (and therefore the HTTP server) is never frozen while
             # waiting for the database to respond.
-            await asyncio.to_thread(lambda: Base.metadata.create_all(bind=engine))
+            await asyncio.to_thread(Base.metadata.create_all, bind=engine)
             try:
                 await asyncio.to_thread(ensure_schema_compatibility)
             except Exception as compat_exc:

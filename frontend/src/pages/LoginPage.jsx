@@ -57,7 +57,7 @@ export default function LoginPage({ onLogin }) {
           setError(
             err?.response?.status === 401
               ? "Invalid username or password."
-              : "Login failed. Check your username and password."
+              : "Login failed. Please try again."
           );
         }
       });
