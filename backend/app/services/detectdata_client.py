@@ -157,7 +157,10 @@ class DetectDataClient:
         channel_defs: list[RemoteChannelDef] = []
 
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
+            browser = playwright.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+            )
             context = browser.new_context()
             page = context.new_page()
 
@@ -217,7 +220,10 @@ class DetectDataClient:
         start_ms = int((datetime.utcnow() - timedelta(days=max(days_back, 1))).timestamp() * 1000)
 
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
+            browser = playwright.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+            )
             context = browser.new_context()
             page = context.new_page()
 

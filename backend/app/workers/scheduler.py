@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 
@@ -28,7 +30,14 @@ def configure_scheduler() -> None:
     scheduler.remove_all_jobs()
 
     if not configs:
-        scheduler.add_job(run_sync_job, "interval", minutes=5, id="default-sync", replace_existing=True)
+        scheduler.add_job(
+            run_sync_job,
+            "interval",
+            minutes=5,
+            id="default-sync",
+            replace_existing=True,
+            next_run_time=datetime.utcnow(),
+        )
         return
 
     for cfg in configs:
@@ -39,6 +48,7 @@ def configure_scheduler() -> None:
             minutes=max(cfg.frequency_minutes, 1),
             id=job_id,
             replace_existing=True,
+            next_run_time=datetime.utcnow(),
         )
 
 
