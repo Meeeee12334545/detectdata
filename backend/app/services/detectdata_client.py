@@ -150,6 +150,123 @@ class DetectDataClient:
 
         return decoded
 
+    _CHROMIUM_ARGS = [
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-sync",
+        "--metrics-recording-only",
+    ]
+
+    def _build_channel_defs_from_site_locations(self, site_locations: list) -> list[RemoteChannelDef]:
+        channel_defs: list[RemoteChannelDef] = []
+        for site in site_locations:
+            site_id = site.get("siteId")
+            site_name = site.get("name")
+            if not site_id or not site_name:
+                continue
+
+            pmac = str(site_id).zfill(4)
+            device_name = f"PMAC-{pmac}"
+            channels = site.get("channels") or []
+
+            for channel in channels:
+                channel_no = channel.get("channel")
+                units = channel.get("units")
+                if channel_no is None:
+                    continue
+
+                parameter = self._parameter_from_units(units) or f"channel_{channel_no}"
+                channel_defs.append(
+                    RemoteChannelDef(
+                        site_name=str(site_name),
+                        site_pmac=pmac,
+                        device_name=device_name,
+                        channel_parameter=parameter,
+                        units=units,
+                        stream_id=f"{site_id}_{channel_no}",
+                    )
+                )
+        return channel_defs
+
+    def _get_site_locations(self, page) -> list[RemoteChannelDef]:
+        site_locations_result = self._asmx_json(page, "LoggerDetails.ashx/GetSiteLocations", {})
+        site_locations = site_locations_result.get("data") if site_locations_result.get("ok") else []
+        if not isinstance(site_locations, list):
+            site_locations = []
+        return self._build_channel_defs_from_site_locations(site_locations)
+
+    def fetch_all(self, days_back: int = 3) -> tuple[list[RemoteChannelDef], list[RemoteReading]]:
+        """Fetch inventory and latest readings in a single browser session."""
+        if not self.username or not self.password:
+            return [], []
+
+        channel_defs: list[RemoteChannelDef] = []
+        readings: list[RemoteReading] = []
+        end_ms = int(datetime.utcnow().timestamp() * 1000)
+        start_ms = int((datetime.utcnow() - timedelta(days=max(days_back, 1))).timestamp() * 1000)
+
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True,
+                args=self._CHROMIUM_ARGS,
+            )
+            context = browser.new_context()
+            page = context.new_page()
+
+            if not self._login(page):
+                browser.close()
+                raise RuntimeError("DetectData login failed")
+
+            channel_defs = self._get_site_locations(page)
+
+            for channel_def in channel_defs:
+                stream_result = self._asmx_json(
+                    page,
+                    "Data.ashx/GetStreamData",
+                    {"streamId": channel_def.stream_id, "start": start_ms, "end": end_ms},
+                )
+                if not stream_result.get("ok"):
+                    continue
+
+                data = stream_result.get("data")
+                if not isinstance(data, dict) or not data:
+                    continue
+
+                latest_point: tuple[datetime, float] | None = None
+
+                for range_key, points in data.items():
+                    if not isinstance(points, list) or not points:
+                        continue
+                    decoded_points = self._decode_block_points(str(range_key), points)
+                    if not decoded_points:
+                        continue
+
+                    point = decoded_points[-1]
+                    if latest_point is None or point[0] > latest_point[0]:
+                        latest_point = point
+
+                if latest_point is not None:
+                    readings.append(
+                        RemoteReading(
+                            site_name=channel_def.site_name,
+                            site_pmac=channel_def.site_pmac,
+                            device_name=channel_def.device_name,
+                            channel_parameter=channel_def.channel_parameter,
+                            units=channel_def.units,
+                            timestamp=latest_point[0],
+                            value=latest_point[1],
+                        )
+                    )
+
+            browser.close()
+
+        return channel_defs, readings
+
     def fetch_inventory(self) -> list[RemoteChannelDef]:
         if not self.username or not self.password:
             return []
@@ -159,7 +276,7 @@ class DetectDataClient:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                args=self._CHROMIUM_ARGS,
             )
             context = browser.new_context()
             page = context.new_page()
@@ -168,38 +285,7 @@ class DetectDataClient:
                 browser.close()
                 raise RuntimeError("DetectData login failed")
 
-            site_locations_result = self._asmx_json(page, "LoggerDetails.ashx/GetSiteLocations", "{}")
-            site_locations = site_locations_result.get("data") if site_locations_result.get("ok") else []
-            if not isinstance(site_locations, list):
-                site_locations = []
-
-            for site in site_locations:
-                site_id = site.get("siteId")
-                site_name = site.get("name")
-                if not site_id or not site_name:
-                    continue
-
-                pmac = str(site_id).zfill(4)
-                device_name = f"PMAC-{pmac}"
-                channels = site.get("channels") or []
-
-                for channel in channels:
-                    channel_no = channel.get("channel")
-                    units = channel.get("units")
-                    if channel_no is None:
-                        continue
-
-                    parameter = self._parameter_from_units(units) or f"channel_{channel_no}"
-                    channel_defs.append(
-                        RemoteChannelDef(
-                            site_name=str(site_name),
-                            site_pmac=pmac,
-                            device_name=device_name,
-                            channel_parameter=parameter,
-                            units=units,
-                            stream_id=f"{site_id}_{channel_no}",
-                        )
-                    )
+            channel_defs = self._get_site_locations(page)
 
             browser.close()
 
@@ -222,7 +308,7 @@ class DetectDataClient:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                args=self._CHROMIUM_ARGS,
             )
             context = browser.new_context()
             page = context.new_page()
@@ -232,7 +318,7 @@ class DetectDataClient:
                 raise RuntimeError("DetectData login failed")
 
             if channel_defs is None:
-                channel_defs = self.fetch_inventory()
+                channel_defs = self._get_site_locations(page)
 
             chunk_ms = max(chunk_days, 1) * 24 * 60 * 60 * 1000
 

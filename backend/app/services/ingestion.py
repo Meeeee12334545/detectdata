@@ -167,8 +167,9 @@ class IngestionService:
         return inserted
 
     def sync_all(self, db: Session) -> dict:
-        inventory = self.client.fetch_inventory()
-        for channel_def in inventory:
+        channel_defs, readings = self.client.fetch_all(days_back=3)
+
+        for channel_def in channel_defs:
             self._upsert_channel(
                 db,
                 site_name=channel_def.site_name,
@@ -178,7 +179,6 @@ class IngestionService:
                 units=channel_def.units,
             )
 
-        readings = self.client.fetch_readings(channel_defs=inventory, days_back=3, latest_only=True)
         inserted, skipped = self._insert_readings(db, readings)
         derived_inserted = self._apply_derived_flow(db)
 
@@ -191,7 +191,7 @@ class IngestionService:
             "inserted": inserted,
             "skipped": skipped,
             "derived_inserted": derived_inserted,
-            "sites": len({c.site_pmac for c in inventory}),
+            "sites": len({c.site_pmac for c in channel_defs}),
         }
 
     def backfill_all(self, db: Session, days_back: int = 3650, chunk_days: int = 90) -> dict:

@@ -1,12 +1,14 @@
+import logging
 from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 
-from app.db.models import PollingConfig
+from app.db.models import IngestionJobLog, PollingConfig
 from app.db.session import SessionLocal
 from app.services.ingestion import IngestionService
 
+logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler()
 _service = IngestionService()
@@ -16,6 +18,14 @@ def run_sync_job() -> None:
     db: Session = SessionLocal()
     try:
         _service.sync_all(db)
+    except Exception as exc:
+        logger.exception("Scheduled sync failed: %s", exc)
+        try:
+            db.rollback()
+            db.add(IngestionJobLog(status="error", message=str(exc)[:1000]))
+            db.commit()
+        except Exception:
+            pass
     finally:
         db.close()
 

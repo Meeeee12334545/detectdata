@@ -12,7 +12,7 @@ def _build_engine():
         # SQLite does not support connect_timeout; check_same_thread=False is
         # required for multi-threaded use (e.g. background scheduler).
         return create_engine(url, future=True, connect_args={"check_same_thread": False})
-    return create_engine(url, future=True, connect_args={"connect_timeout": 10})
+    return create_engine(url, future=True, pool_pre_ping=True, connect_args={"connect_timeout": 10})
 
 
 engine = _build_engine()
