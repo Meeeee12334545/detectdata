@@ -8,6 +8,7 @@ from app.db.models import (
     Channel,
     ChannelAdminSetting,
     Device,
+    IngestionJobLog,
     PollingConfig,
     Role,
     Site,
@@ -242,3 +243,25 @@ def create_flow_channel(
     db.commit()
     db.refresh(channel)
     return {"channel_id": channel.channel_id, "parameter": channel.parameter, "units": channel.units}
+
+
+@router.get("/logs")
+def list_ingestion_logs(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> list[dict]:
+    logs = (
+        db.query(IngestionJobLog)
+        .order_by(IngestionJobLog.run_at.desc())
+        .limit(50)
+        .all()
+    )
+    return [
+        {
+            "id": log.id,
+            "run_at": log.run_at,
+            "status": log.status,
+            "message": log.message,
+        }
+        for log in logs
+    ]
