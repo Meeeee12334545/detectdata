@@ -10,6 +10,8 @@ from app.services.ingestion import IngestionService
 
 logger = logging.getLogger(__name__)
 
+_MAX_LOG_MESSAGE_LEN = 1000
+
 scheduler = BackgroundScheduler()
 _service = IngestionService()
 
@@ -22,10 +24,10 @@ def run_sync_job() -> None:
         logger.exception("Scheduled sync failed: %s", exc)
         try:
             db.rollback()
-            db.add(IngestionJobLog(status="error", message=str(exc)[:1000]))
+            db.add(IngestionJobLog(status="error", message=str(exc)[:_MAX_LOG_MESSAGE_LEN]))
             db.commit()
         except Exception:
-            pass
+            logger.exception("Failed to write error log to database")
     finally:
         db.close()
 
